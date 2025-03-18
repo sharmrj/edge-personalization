@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "edgepoctarget",
+	"name": "edgepoc2",
 	"main": "src/index.js",
 	"compatibility_date": "2025-03-11",
 	"observability": {

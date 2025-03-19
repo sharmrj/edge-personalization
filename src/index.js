@@ -1,37 +1,99 @@
+
+// export default {
+// 	async fetch(request) {
+// 	  return new Response("Hello from Cloudflare Worker!", {
+// 		headers: { "Content-Type": "text/plain" },
+// 	  });
+// 	},
+//   };
+
 // Cloudflare Worker for Edge Personalization with HTMLRewriter
 addEventListener("fetch", (event) => {
 	console.log("Received request:", event.request.url);
-	event.respondWith(handleRequest(event.request))
-  })
+	event.respondWith(handleRequest(event.request));
+  });
   
   const corsHeaders = {
 	"Access-Control-Allow-Origin": "*",
 	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 	"Access-Control-Allow-Headers": "Content-Type, Cookie, Authorization",
 	"Access-Control-Max-Age": "86400",
-  }
+  };
   
   async function handleRequest(request) {
 	try {
-	  const url = new URL(request.url)
-	  
+	  const url = new URL(request.url);
+  
 	  if (request.method === "OPTIONS") {
-		return handleOptions(request)
+		return handleOptions(request);
 	  }
-	  
+  
+	  // Extract the path from the request URL
+	  const path = url.pathname + url.search; // Include query parameters
+	  console.log("Extracted path:", path);
+  
+	  // Construct the target URL
+	  const targetUrl = `https://main--cc--adobecom.aem.page${path}`;
+	  console.log("Target URL:", targetUrl);
+  
 	  if (shouldProcessRequest(url)) {
-		return handleEdgePersonalization(request, url)
+		return handleEdgePersonalization(request, url);
 	  }
-	  
-	  return fetch(request)
+  
+	  // Fetch the original page from the target URL
+	  const response = await fetch(targetUrl, {
+		headers: request.headers, // Forward original headers
+	  });
+  
+	  // Return the response
+	  return new Response(response.body, {
+		status: response.status,
+		headers: response.headers,
+	  });
 	} catch (error) {
-	  console.error("Error in main handler:", error)
+	  console.error("Error in main handler:", error);
 	  return new Response(`Server Error: ${error.message}`, {
 		status: 500,
 		headers: corsHeaders,
-	  })
+	  });
 	}
   }
+  
+
+//   // Cloudflare Worker for Edge Personalization with HTMLRewriter
+// addEventListener("fetch", (event) => {
+// 	console.log("Received request:", event.request.url);
+// 	event.respondWith(handleRequest(event.request))
+//   })
+  
+//   const corsHeaders = {
+// 	"Access-Control-Allow-Origin": "*",
+// 	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+// 	"Access-Control-Allow-Headers": "Content-Type, Cookie, Authorization",
+// 	"Access-Control-Max-Age": "86400",
+//   }
+  
+//   async function handleRequest(request) {
+// 	try {
+// 	  const url = new URL(request.url)
+	  
+// 	  if (request.method === "OPTIONS") {
+// 		return handleOptions(request)
+// 	  }
+	  
+// 	  if (shouldProcessRequest(url)) {
+// 		return handleEdgePersonalization(request, url)
+// 	  }
+	  
+// 	  return fetch(request)
+// 	} catch (error) {
+// 	  console.error("Error in main handler:", error)
+// 	  return new Response(`Server Error: ${error.message}`, {
+// 		status: 500,
+// 		headers: corsHeaders,
+// 	  })
+// 	}
+//   }
   
   function shouldProcessRequest(url) {
 	return url.searchParams.has("edge-pers") || 
@@ -157,11 +219,20 @@ addEventListener("fetch", (event) => {
   
   // Generate a UUID v4
   function generateUUIDv4() {
-	return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-	  const r = (Math.random() * 16) | 0
-	  const v = c === "x" ? r : (r & 0x3) | 0x8
-	  return v.toString(16)
-	})
+	const randomValues = new Uint8Array(16);
+	crypto.getRandomValues(randomValues);
+	randomValues[6] = (randomValues[6] % 16) + 64;
+	randomValues[8] = (randomValues[8] % 16) + 128;
+	let uuid = '';
+	randomValues.forEach((byte, index) => {
+	  const hex = byte.toString(16).padStart(2, '0');
+	  if (index === 4 || index === 6 || index === 8 || index === 10) {
+		uuid += '-';
+	  }
+	  uuid += hex;
+	});
+  
+	return uuid;
   }
   
   // Get cookies from request
@@ -236,15 +307,14 @@ addEventListener("fetch", (event) => {
 		request,
 		DATA_STREAM_ID,
 	  })
+	  console.log("Request payload:", JSON.stringify(requestBody, null, 2));
 	  
 	  // Make the request to Adobe Target
 	  const targetResp = await fetch(`${TARGET_API_URL}?dataStreamId=${DATA_STREAM_ID}&requestId=${generateUUIDv4()}`, {
 		method: "POST",
 		body: JSON.stringify(requestBody),
-		headers: {
-		  "Content-Type": "application/json",
-		},
 	  })
+	  console.log("Target Response",targetResp)
 	  
 	  if (!targetResp.ok) {
 		throw new Error(`Failed to fetch interact call: ${targetResp.status} ${targetResp.statusText}`)
@@ -291,6 +361,7 @@ addEventListener("fetch", (event) => {
 			}
 		  ]
 		}
+		console.log("Identity Map", identityMap)
 	  }
 	}
 	
@@ -318,20 +389,20 @@ addEventListener("fetch", (event) => {
 			  "isHomePage": url.pathname === "/",
 			  "name": pageName,
 			  "pageViews": {
-				"value": 1
+				"value": 0
 			  }
 			},
+			webInteraction: {
+				name: 'Martech-API',
+				type: 'other',
+				linkClicks: { value: 1 },
+			  },
 			"webReferrer": {
 			  "URL": request.headers.get("Referer") || ""
 			}
 		  },
 		  "timestamp": new Date().toISOString(),
 		  "eventType": "decisioning.propositionFetch",
-		  "implementationDetails": {
-			"name": "https://ns.adobe.com/experience/alloy/reactor",
-			"version": "1.0",
-			"environment": "serverapi"
-		  }
 		},
 		"data": {
 		  "__adobe": {
@@ -345,24 +416,11 @@ addEventListener("fetch", (event) => {
 			}
 		  },
 		  "_adobe_corpnew": {
+			marketingtech: { adobe: { alloy: { approach: 'martech-API' } } },
 			"digitalData": {
 			  "page": {
 				"pageInfo": {
 				  "language": locale.ietf,
-				  "pageName": pageName,
-				  "processedPageName": pageName,
-				  "location": {
-					"href": url.href,
-					"origin": url.origin,
-					"protocol": url.protocol,
-					"host": url.host,
-					"hostname": url.hostname,
-					"port": url.port,
-					"pathname": url.pathname,
-					"search": url.search,
-					"hash": url.hash
-				  },
-				  "siteSection": url.hostname
 				}
 			  },
 			  "diagnostic": {
@@ -380,39 +438,11 @@ addEventListener("fetch", (event) => {
 				  "profileInfo": {
 					"authState": "loggedOut",
 					"returningStatus": "Repeat",
-					"entitlementCreativeCloud": "unknown",
-					"entitlementStatusCreativeCloud": "unknown"
 				  }
 				}
 			  },
-			  "target": {
-				"at_property_val": AT_PROPERTY_VAL
-			  }
 			}
 		  },
-		  "marketingtech": {
-			"adobe": {
-			  "alloy": {
-				"approach": "martech-API",
-				"edgeConfigIdLaunch": DATA_STREAM_ID,
-				"edgeConfigId": DATA_STREAM_ID
-			  }
-			}
-		  },
-		  "web": {
-			"webPageDetails": {
-			  "URL": url.href,
-			  "siteSection": url.hostname,
-			  "server": url.hostname,
-			  "isErrorPage": false,
-			  "isHomePage": url.pathname === "/",
-			  "name": pageName,
-			  "pageViews": {
-				"value": 1
-			  }
-			}
-		  },
-		  "eventType": "decisioning.propositionFetch"
 		}
 	  },
 	  "query": {
@@ -431,9 +461,6 @@ addEventListener("fetch", (event) => {
 			"https://ns.adobe.com/personalization/message/in-app",
 			"https://ns.adobe.com/personalization/message/content-card",
 			"https://ns.adobe.com/personalization/dom-action"
-		  ],
-		  "surfaces": [
-			`web://${url.hostname}${url.pathname}`
 		  ],
 		  "decisionScopes": [
 			"__view__"

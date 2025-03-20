@@ -33,17 +33,19 @@ addEventListener("fetch", (event) => {
 	  console.log("Extracted path:", path);
   
 	  // Construct the target URL
-	  const targetUrl = `https://main--cc--adobecom.aem.page${path}`;
+	  const targetUrl = url.origin + url.pathname;
 	  console.log("Target URL:", targetUrl);
   
 	  if (shouldProcessRequest(url)) {
+		console.log("Handle EDGE PERS", handleEdgePersonalization(request, url))
 		return handleEdgePersonalization(request, url);
 	  }
   
 	  // Fetch the original page from the target URL
 	  const response = await fetch(targetUrl, {
-		headers: request.headers, // Forward original headers
+		headers: {...request.headers, "Authorization": "token hlxtst_eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJjYy0tYWRvYmVjb20uYWVtLnBhZ2UiLCJzdWIiOiJtYWFncmF3YWxAYWRvYmUuY29tIiwiZXhwIjoxNzQyNTQ2NTM3fQ.NUlxOwxs5OxDFN_PAY31ZFM_zBFa6q36buniu4KtD73pYGB-9FwefySOWsiW7-Jz7CQmJXp2APKCa3Zea4PIB3MVa_APSrxIfMOLxj6ayszgyvwMe3TQ9f__HtN8Sqw8QzMmy25R9SxytDStAZ_firzYoVqKlRWr0W2Ojd3lEwRqJ9NOPYjZsYllQ8oR6RMgqE4vxcTcALJR5Ulcvl4g7sBDQVag5UDlLhIisPeuw01zShsPJMMr32Hga_5GQw63qUx0VRhq8juAy2IE9Hk-3Pn99wWY9yJM2OZ3Gol-RbzUZ26QHstrWlCdISs-Pspc__j0qHjCq6-Ol8Q6hBwevQ"}, // Forward original headers
 	  });
+	  console.log("Headers Response:", response);
   
 	  // Return the response
 	  return new Response(response.body, {
@@ -62,7 +64,7 @@ addEventListener("fetch", (event) => {
 
 //   // Cloudflare Worker for Edge Personalization with HTMLRewriter
 // addEventListener("fetch", (event) => {
-// 	console.log("Received request:", event.request.url);
+// 	//console.log("Received request:", event.request.url);
 // 	event.respondWith(handleRequest(event.request))
 //   })
   
@@ -109,8 +111,10 @@ addEventListener("fetch", (event) => {
 	  const env = determineEnvironment(url)
 	  
 	  const originalResponse = await fetchOriginalPage(request, url)
+	  console.log("Original Response:", originalResponse);
 	  
 	  const contentType = originalResponse.headers.get("content-type") || ""
+	  console.log("Content Type:", contentType);
 	  if (!contentType.includes("text/html")) {
 		return originalResponse
 	  }
@@ -143,7 +147,7 @@ addEventListener("fetch", (event) => {
   async function fetchOriginalPage(request, url) {
 	const originRequest = new Request(url.toString(), {
 	  method: "GET",
-	  headers: request.headers,
+	  headers: {...request.headers, "Authorization": "token hlxtst_eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJjYy0tYWRvYmVjb20uYWVtLnBhZ2UiLCJzdWIiOiJha2Fuc2hhYUBhZG9iZS5jb20iLCJleHAiOjE3NDI1MzQ5MDF9.AqM2BPNeWqG-nMXZxs4103AN0FCMD-V9maSu4scXL7tA_BNuvUif5DALq86xVOO8rMYY4Ei4UULLJy1FTZojO17Xr4KEJzGICkLzRa7cylzbVfnAeAsSh60MsP9RGUDXVvs2QkULXAOIEV5DwnoehlHqrPw7E4LiA9Xdtwa61Cvuc1ZdgS9tzc3zCFnoy_nwSwRJtKb4K473HBu1JxAxqxKawqPbwNF3c8Vt_6M0yuwzTd3zWkpXXGPmlJzgAt10CyLDemeD3ahVotvAgU5k3xhvIyonWdgS4lpjq0qsHZjJZjRkJhMNyI2HZyXqG5W7FfLl4BLUVimePGrdQfGpow"},
 	  redirect: "follow",
 	})
 	
@@ -153,7 +157,8 @@ addEventListener("fetch", (event) => {
 	Object.keys(corsHeaders).forEach(key => {
 	  newHeaders.set(key, corsHeaders[key])
 	})
-	
+	console.log("New Headers:", newHeaders);
+
 	return new Response(response.body, {
 	  status: response.status,
 	  statusText: response.statusText,
@@ -376,115 +381,163 @@ addEventListener("fetch", (event) => {
 	  .map(([key, value]) => ({ key, value }))
 	
 	return {
-	  "event": {
-		"xdm": {
-		  ...updatedContext,
-		  "identityMap": identityMap,
-		  "web": {
-			"webPageDetails": {
-			  "URL": url.href,
-			  "siteSection": url.hostname,
-			  "server": url.hostname,
-			  "isErrorPage": false,
-			  "isHomePage": url.pathname === "/",
-			  "name": pageName,
-			  "pageViews": {
-				"value": 0
-			  }
+		"event": {
+			"xdm": {
+				"device": {
+					"screenHeight": 1117,
+					"screenWidth": 1728,
+					"screenOrientation": "landscape"
+				},
+				"environment": {
+					"type": "browser",
+					"browserDetails": {
+						"viewportWidth": 1728,
+						"viewportHeight": 275
+					}
+				},
+				"placeContext": {
+					"localTime": "2025-03-14T06:11:32.623Z",
+					"localTimezoneOffset": -330
+				},
+				"identityMap": {
+					"ECID": [
+						{
+							"id": "89199314073073960203854048274649182064",
+							"authenticatedState": "ambiguous",
+							"primary": true
+						}
+					]
+				},
+				"web": {
+					"webPageDetails": {
+						"URL": "https://www.adobe.com/products/photoshop.html?hybrid-pers=off&target=on",
+						"siteSection": "www.adobe.com",
+						"server": "www.adobe.com",
+						"isErrorPage": false,
+						"isHomePage": false,
+						"name": "adobe.com:products:photoshop",
+						"pageViews": {
+							"value": 0
+						}
+					},
+					"webInteraction": {
+						"name": "Martech-API",
+						"type": "other",
+						"linkClicks": {
+							"value": 1
+						}
+					},
+					"webReferrer": {
+						"URL": ""
+					}
+				},
+				"timestamp": "2025-03-14T06:11:32.624Z",
+				"eventType": "decisioning.propositionFetch"
 			},
-			webInteraction: {
-				name: 'Martech-API',
-				type: 'other',
-				linkClicks: { value: 1 },
-			  },
-			"webReferrer": {
-			  "URL": request.headers.get("Referer") || ""
+			"data": {
+				"__adobe": {
+					"target": {
+						"is404": false,
+						"authState": "loggedOut",
+						"hitType": "propositionFetch",
+						"isMilo": true,
+						"adobeLocale": "en-US",
+						"hasGnav": true
+					}
+				},
+				"_adobe_corpnew": {
+					"digitalData": {
+						"page": {
+							"pageInfo": {
+								"language": "en-US"
+							}
+						},
+						"diagnostic": {
+							"franklin": {
+								"implementation": "milo"
+							}
+						},
+						"previousPage": {
+							"pageInfo": {
+								"pageName": "adobe.com:products:photoshop"
+							}
+						},
+						"primaryUser": {
+							"primaryProfile": {
+								"profileInfo": {
+									"authState": "loggedOut",
+									"returningStatus": "New"
+								}
+							}
+						}
+					}
+				},
+				"marketingtech": {
+					"adobe": {
+						"alloy": {
+							"approach": "martech-API",
+							"edgeConfigIdLaunch": "913eac4d-900b-45e8-9ee7-306216765cd2",
+							"edgeConfigId": "913eac4d-900b-45e8-9ee7-306216765cd2"
+						}
+					}
+				}
 			}
-		  },
-		  "timestamp": new Date().toISOString(),
-		  "eventType": "decisioning.propositionFetch",
 		},
-		"data": {
-		  "__adobe": {
+		"query": {
+			"identity": {
+				"fetch": [
+					"ECID"
+				]
+			},
+			"personalization": {
+				"schemas": [
+					"https://ns.adobe.com/personalization/default-content-item",
+					"https://ns.adobe.com/personalization/html-content-item",
+					"https://ns.adobe.com/personalization/json-content-item",
+					"https://ns.adobe.com/personalization/redirect-item",
+					"https://ns.adobe.com/personalization/ruleset-item",
+					"https://ns.adobe.com/personalization/message/in-app",
+					"https://ns.adobe.com/personalization/message/content-card",
+					"https://ns.adobe.com/personalization/dom-action"
+				],
+				"surfaces": [
+					"web://www.adobe.com/products/photoshop.html"
+				],
+				"decisionScopes": [
+					"__view__"
+				]
+			}
+		},
+		"meta": {
 			"target": {
-			  "is404": false,
-			  "authState": "loggedOut",
-			  "hitType": "propositionFetch",
-			  "isMilo": true,
-			  "adobeLocale": locale.ietf,
-			  "hasGnav": true
+				"migration": true
+			},
+			"configOverrides": {
+				"com_adobe_analytics": {
+					"reportSuites": [
+						"adbadobenonacdcprod",
+						"adbadobeprototype"
+					]
+				},
+				"com_adobe_target": {
+					"propertyToken": "4db35ee5-63ad-59f6-cec6-82ef8863b22d"
+				}
+			},
+			"state": {
+				"domain": "adobe.com",
+				"cookiesEnabled": true,
+				"entries": [
+					{
+						"key": "kndctr_9E1005A551ED61CA0A490D45_AdobeOrg_cluster",
+						"value": "jpn3"
+					},
+					{
+						"key": "kndctr_9E1005A551ED61CA0A490D45_AdobeOrg_identity",
+						"value": "CiY4OTE5OTMxNDA3MzA3Mzk2MDIwMzg1NDA0ODI3NDY0OTE4MjA2NFIRCOzxlJrZMhgBKgRKUE4zMALwAezxlJrZMg%3D%3D"
+					}
+				]
 			}
-		  },
-		  "_adobe_corpnew": {
-			marketingtech: { adobe: { alloy: { approach: 'martech-API' } } },
-			"digitalData": {
-			  "page": {
-				"pageInfo": {
-				  "language": locale.ietf,
-				}
-			  },
-			  "diagnostic": {
-				"franklin": {
-				  "implementation": "milo"
-				}
-			  },
-			  "previousPage": {
-				"pageInfo": {
-				  "pageName": prevPageName || pageName
-				}
-			  },
-			  "primaryUser": {
-				"primaryProfile": {
-				  "profileInfo": {
-					"authState": "loggedOut",
-					"returningStatus": "Repeat",
-				  }
-				}
-			  },
-			}
-		  },
 		}
-	  },
-	  "query": {
-		"identity": {
-		  "fetch": [
-			"ECID"
-		  ]
-		},
-		"personalization": {
-		  "schemas": [
-			"https://ns.adobe.com/personalization/default-content-item",
-			"https://ns.adobe.com/personalization/html-content-item",
-			"https://ns.adobe.com/personalization/json-content-item",
-			"https://ns.adobe.com/personalization/redirect-item",
-			"https://ns.adobe.com/personalization/ruleset-item",
-			"https://ns.adobe.com/personalization/message/in-app",
-			"https://ns.adobe.com/personalization/message/content-card",
-			"https://ns.adobe.com/personalization/dom-action"
-		  ],
-		  "decisionScopes": [
-			"__view__"
-		  ]
-		}
-	  },
-	  "meta": {
-		"target": {
-		  "migration": true
-		},
-		"configOverrides": {
-		  "com_adobe_analytics": {
-			"reportSuites": REPORT_SUITES_ID
-		  },
-		  "com_adobe_target": {
-			"propertyToken": AT_PROPERTY_VAL
-		  }
-		},
-		"state": {
-		  "domain": url.hostname,
-		  "cookiesEnabled": true,
-		  "entries": stateEntries
-		}
-	  }
 	}
   }
   
@@ -522,6 +575,7 @@ addEventListener("fetch", (event) => {
   function processPersonalizationData(targetData) {
 	// Extract personalization decisions
 	const propositions = targetData?.handle?.find(d => d.type === "personalization:decisions")?.payload || []
+	console.log("Propositions:", propositions);
 	
 	if (propositions.length === 0) {
 	  console.log("No propositions found in Target response")
@@ -630,7 +684,7 @@ addEventListener("fetch", (event) => {
 		  "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
 		}
 	  })
-	  
+	  console.log("Fragment Response:", response.text());
 	  if (!response.ok) {
 		throw new Error(`Failed to fetch fragment: ${response.status} ${response.statusText}`)
 	  }
@@ -653,6 +707,7 @@ addEventListener("fetch", (event) => {
 		fragments.map(async (fragment) => {
 		  try {
 			const content = await fetchFragmentContent(fragment.val, url)
+			console.log("Apply Pers HTML Rewriter:", content);
 			fragmentContentMap.set(fragment.selector, content)
 		  } catch (error) {
 			console.error(`Error fetching fragment ${fragment.selector}:`, error)
@@ -677,6 +732,7 @@ addEventListener("fetch", (event) => {
 	  fragments.forEach((fragment) => {
 		if (fragmentContentMap.has(fragment.selector)) {
 		  const fragmentContent = fragmentContentMap.get(fragment.selector)
+		  console.log("Fragment Content:", fragmentContent);
 		  const startCommentSelector = `!-- fragment ${fragment.selector} start --`
 		  
 		  rewriter = rewriter.on(startCommentSelector, {
@@ -719,12 +775,15 @@ addEventListener("fetch", (event) => {
 	  })
 	  
 	  const transformedResponse = rewriter.transform(response)
+	  console.log("Transformed Response:", transformedResponse);
 	  
 	  const newHeaders = new Headers(transformedResponse.headers)
+	  console.log("New Headers:", newHeaders);
 	  Object.keys(corsHeaders).forEach(key => {
 		newHeaders.set(key, corsHeaders[key])
 	  })
 	  newHeaders.set("x-edge-personalized", "true")
+	  console.log("New Headers:", newHeaders);
 	  
 	  return new Response(transformedResponse.body, {
 		status: transformedResponse.status,

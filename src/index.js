@@ -1,25 +1,76 @@
-
-// export default {
-// 	async fetch(request) {
-// 	  return new Response("Hello from Cloudflare Worker!", {
-// 		headers: { "Content-Type": "text/plain" },
-// 	  });
-// 	},
-//   };
-
 // Cloudflare Worker for Edge Personalization with HTMLRewriter
 addEventListener("fetch", (event) => {
 	console.log("Received request:", event.request.url);
 	event.respondWith(handleRequest(event.request));
-  });
+});
   
-  const corsHeaders = {
-	"Access-Control-Allow-Origin": "*",
-	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-	"Access-Control-Allow-Headers": "Content-Type, Cookie, Authorization",
-	"Access-Control-Max-Age": "86400",
-  };
+const corsHeaders = {
+"Access-Control-Allow-Origin": "*",
+"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+"Access-Control-Allow-Headers": "Content-Type, Cookie, Authorization",
+"Access-Control-Max-Age": "86400",
+};
+
+const AMCV_COOKIE = 'AMCV_9E1005A551ED61CA0A490D45@AdobeOrg';
+const KNDCTR_COOKIE_KEYS = [
+'kndctr_9E1005A551ED61CA0A490D45_AdobeOrg_identity',
+'kndctr_9E1005A551ED61CA0A490D45_AdobeOrg_cluster',
+];
   
+  function getOrGenerateUserId(request) {
+	const cookies = getCookiesFromRequest(request)
+	const amcvCookieValue = cookies[AMCV_COOKIE]
+  
+	// If ECID is not found, generate and return FPID
+	if (!amcvCookieValue || (amcvCookieValue.indexOf('MCMID|') === -1)) {
+	  const fpidValue = generateUUIDv4();
+	  return {
+		FPID: [{
+		  id: fpidValue,
+		  authenticatedState: 'ambiguous',
+		  primary: true,
+		}],
+	  };
+	}
+  
+	return {
+	  ECID: [{
+		id: amcvCookieValue.match(/MCMID\|([^|]+)/)?.[1],
+		authenticatedState: 'ambiguous',
+		primary: true,
+	  }],
+	};
+  }
+
+  function getUpdatedContext({
+	screenWidth, screenHeight, screenOrientation,
+	viewportWidth, viewportHeight, localTime, timezoneOffset,
+  }) {
+	return {
+	  device: {
+		screenHeight,
+		screenWidth,
+		screenOrientation,
+	  },
+	  environment: {
+		type: 'browser',
+		browserDetails: {
+		  viewportWidth,
+		  viewportHeight,
+		},
+	  },
+	  placeContext: {
+		localTime,
+		localTimezoneOffset: timezoneOffset,
+	  },
+	};
+  }
+
+//   const getMartechCookies = () => document.cookie.split(';')
+//   .map((x) => x.trim().split('='))
+//   .filter(([key]) => KNDCTR_COOKIE_KEYS.includes(key))
+//   .map(([key, value]) => ({ key, value }));
+
   async function handleRequest(request) {
 	try {
 	  const url = new URL(request.url);
@@ -43,7 +94,7 @@ addEventListener("fetch", (event) => {
   
 	  // Fetch the original page from the target URL
 	  const response = await fetch(targetUrl, {
-		headers: {...request.headers, "Authorization": "token hlxtst_eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJjYy0tYWRvYmVjb20uYWVtLnBhZ2UiLCJzdWIiOiJtYWFncmF3YWxAYWRvYmUuY29tIiwiZXhwIjoxNzQyNTQ2NTM3fQ.NUlxOwxs5OxDFN_PAY31ZFM_zBFa6q36buniu4KtD73pYGB-9FwefySOWsiW7-Jz7CQmJXp2APKCa3Zea4PIB3MVa_APSrxIfMOLxj6ayszgyvwMe3TQ9f__HtN8Sqw8QzMmy25R9SxytDStAZ_firzYoVqKlRWr0W2Ojd3lEwRqJ9NOPYjZsYllQ8oR6RMgqE4vxcTcALJR5Ulcvl4g7sBDQVag5UDlLhIisPeuw01zShsPJMMr32Hga_5GQw63qUx0VRhq8juAy2IE9Hk-3Pn99wWY9yJM2OZ3Gol-RbzUZ26QHstrWlCdISs-Pspc__j0qHjCq6-Ol8Q6hBwevQ"}, // Forward original headers
+		headers: {...request.headers, "Authorization": "token hlxtst_eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJjYy0tYWRvYmVjb20uYWVtLnBhZ2UiLCJzdWIiOiJha2Fuc2hhYUBhZG9iZS5jb20iLCJleHAiOjE3NDI2MjQwNzF9.dX_kp_YyJtcmyDlMP5OX-k8iS-O5Ec0-PseRvNDgvJfmurE6fQ-Wm8Lm97UNOjDzsNU9vWiYPzNKGbyeGZ2CtYT6cL35rbpWVhXXMK7CIbnOCaNxOsuqYC2L8GoupBJcYjrx3d76Sr32OwZmUQWuAMxnswmFlEFmqypbwmILwpffhYty1IQ8WoPeZI_RGCdQ1K_2qCwuxOC0MHRnPyYON5V1I4h-0sz721EJX4V46Mjy1zOBiWkZSFPV1neG-nKZfWxrPEUNP8_iG7GmI5Jf0uv_4hOTe1ZiHiV0L4Ghjkp7I-pOuQOrEwlxcrDLjdpzdy26qFQmrJwiyrCu64wZTw"}, // Forward original headers
 	  });
 	  console.log("Headers Response:", response);
   
@@ -61,42 +112,6 @@ addEventListener("fetch", (event) => {
 	}
   }
   
-
-//   // Cloudflare Worker for Edge Personalization with HTMLRewriter
-// addEventListener("fetch", (event) => {
-// 	//console.log("Received request:", event.request.url);
-// 	event.respondWith(handleRequest(event.request))
-//   })
-  
-//   const corsHeaders = {
-// 	"Access-Control-Allow-Origin": "*",
-// 	"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-// 	"Access-Control-Allow-Headers": "Content-Type, Cookie, Authorization",
-// 	"Access-Control-Max-Age": "86400",
-//   }
-  
-//   async function handleRequest(request) {
-// 	try {
-// 	  const url = new URL(request.url)
-	  
-// 	  if (request.method === "OPTIONS") {
-// 		return handleOptions(request)
-// 	  }
-	  
-// 	  if (shouldProcessRequest(url)) {
-// 		return handleEdgePersonalization(request, url)
-// 	  }
-	  
-// 	  return fetch(request)
-// 	} catch (error) {
-// 	  console.error("Error in main handler:", error)
-// 	  return new Response(`Server Error: ${error.message}`, {
-// 		status: 500,
-// 		headers: corsHeaders,
-// 	  })
-// 	}
-//   }
-  
   function shouldProcessRequest(url) {
 	return url.searchParams.has("edge-pers") || 
 		   url.searchParams.get("target") === "on" || 
@@ -109,7 +124,7 @@ addEventListener("fetch", (event) => {
 	try {
 	  const locale = determineLocale(request, url)
 	  const env = determineEnvironment(url)
-	  
+	
 	  const originalResponse = await fetchOriginalPage(request, url)
 	  console.log("Original Response:", originalResponse);
 	  
@@ -125,7 +140,7 @@ addEventListener("fetch", (event) => {
 		request,
 		url,
 	  })
-	  
+
 	  const processedData = processPersonalizationData(targetData)
 	  
 	  return applyPersonalizationWithHTMLRewriter(originalResponse, processedData, url)
@@ -147,7 +162,7 @@ addEventListener("fetch", (event) => {
   async function fetchOriginalPage(request, url) {
 	const originRequest = new Request(url.toString(), {
 	  method: "GET",
-	  headers: {...request.headers, "Authorization": "token hlxtst_eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJjYy0tYWRvYmVjb20uYWVtLnBhZ2UiLCJzdWIiOiJha2Fuc2hhYUBhZG9iZS5jb20iLCJleHAiOjE3NDI1MzQ5MDF9.AqM2BPNeWqG-nMXZxs4103AN0FCMD-V9maSu4scXL7tA_BNuvUif5DALq86xVOO8rMYY4Ei4UULLJy1FTZojO17Xr4KEJzGICkLzRa7cylzbVfnAeAsSh60MsP9RGUDXVvs2QkULXAOIEV5DwnoehlHqrPw7E4LiA9Xdtwa61Cvuc1ZdgS9tzc3zCFnoy_nwSwRJtKb4K473HBu1JxAxqxKawqPbwNF3c8Vt_6M0yuwzTd3zWkpXXGPmlJzgAt10CyLDemeD3ahVotvAgU5k3xhvIyonWdgS4lpjq0qsHZjJZjRkJhMNyI2HZyXqG5W7FfLl4BLUVimePGrdQfGpow"},
+	  headers: {...request.headers, "Authorization": "token hlxtst_eyJhbGciOiJSUzI1NiJ9.eyJhdWQiOiJjYy0tYWRvYmVjb20uYWVtLnBhZ2UiLCJzdWIiOiJha2Fuc2hhYUBhZG9iZS5jb20iLCJleHAiOjE3NDI2MjQwNzF9.dX_kp_YyJtcmyDlMP5OX-k8iS-O5Ec0-PseRvNDgvJfmurE6fQ-Wm8Lm97UNOjDzsNU9vWiYPzNKGbyeGZ2CtYT6cL35rbpWVhXXMK7CIbnOCaNxOsuqYC2L8GoupBJcYjrx3d76Sr32OwZmUQWuAMxnswmFlEFmqypbwmILwpffhYty1IQ8WoPeZI_RGCdQ1K_2qCwuxOC0MHRnPyYON5V1I4h-0sz721EJX4V46Mjy1zOBiWkZSFPV1neG-nKZfWxrPEUNP8_iG7GmI5Jf0uv_4hOTe1ZiHiV0L4Ghjkp7I-pOuQOrEwlxcrDLjdpzdy26qFQmrJwiyrCu64wZTw"},
 	  redirect: "follow",
 	})
 	
@@ -264,6 +279,7 @@ addEventListener("fetch", (event) => {
 	  const DATA_STREAM_ID =
 		env === "prod" ? "913eac4d-900b-45e8-9ee7-306216765cd2" : "e065836d-be57-47ef-b8d1-999e1657e8fd"
 	  const TARGET_API_URL = `https://edge.adobedc.net/ee/v2/interact`
+	//   const TARGET_API_URL = `https://sstats.adobe.com/ee/ind1/v1/interact`
 	  
 	  // Get device info (server-side adaptation)
 	  const deviceInfo = {
@@ -315,11 +331,12 @@ addEventListener("fetch", (event) => {
 	  console.log("Request payload:", JSON.stringify(requestBody, null, 2));
 	  
 	  // Make the request to Adobe Target
+	  console.log("Cheecking DS id",`${TARGET_API_URL}?dataStreamId=${DATA_STREAM_ID}&requestId=${generateUUIDv4()}`)
 	  const targetResp = await fetch(`${TARGET_API_URL}?dataStreamId=${DATA_STREAM_ID}&requestId=${generateUUIDv4()}`, {
 		method: "POST",
 		body: JSON.stringify(requestBody),
 	  })
-	  console.log("Target Response",targetResp)
+	  console.log("Target Response",await targetResp.json())
 	  
 	  if (!targetResp.ok) {
 		throw new Error(`Failed to fetch interact call: ${targetResp.status} ${targetResp.statusText}`)
@@ -336,9 +353,10 @@ addEventListener("fetch", (event) => {
   function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID }) {
 	const cookies = getCookiesFromRequest(request)
 	const prevPageName = cookies['gpv']
+	// const martechCookie = cookies[KNDCTR_COOKIE_KEYS]
 	
 	const AT_PROPERTY_VAL = getTargetPropertyBasedOnPageRegion(env, url.pathname)
-	const REPORT_SUITES_ID = env === "prod" ? ["adbadobenonacdcprod"] : ["adbadobenacdcqa"]
+	const REPORT_SUITES_ID = env === "prod" ? ["adbadobenonacdcprod"] : ["adbadobenonacdcqa"]
 	
 	// Extract ECID from cookies if available
 	const AMCV_COOKIE = 'AMCV_9E1005A551ED61CA0A490D45@AdobeOrg'
@@ -356,6 +374,7 @@ addEventListener("fetch", (event) => {
 	// If ECID is found in cookies, use it
 	if (amcvCookieValue && amcvCookieValue.indexOf('MCMID|') !== -1) {
 	  const ecid = amcvCookieValue.match(/MCMID\|([^|]+)/)?.[1]
+	  console.log("ECID",ecid)
 	  if (ecid) {
 		identityMap = {
 		  "ECID": [
@@ -379,196 +398,147 @@ addEventListener("fetch", (event) => {
 	const stateEntries = Object.entries(cookies)
 	  .filter(([key]) => KNDCTR_COOKIE_KEYS.includes(key))
 	  .map(([key, value]) => ({ key, value }))
-	
-	return {
+
+	  return {
 		"event": {
-			"xdm": {
-				"device": {
-					"screenHeight": 1117,
-					"screenWidth": 1728,
-					"screenOrientation": "landscape"
-				},
-				"environment": {
-					"type": "browser",
-					"browserDetails": {
-						"viewportWidth": 1728,
-						"viewportHeight": 275
-					}
-				},
-				"placeContext": {
-					"localTime": "2025-03-14T06:11:32.623Z",
-					"localTimezoneOffset": -330
-				},
-				"identityMap": {
-					"ECID": [
-						{
-							"id": "89199314073073960203854048274649182064",
-							"authenticatedState": "ambiguous",
-							"primary": true
-						}
-					]
-				},
-				"web": {
-					"webPageDetails": {
-						"URL": "https://www.adobe.com/products/photoshop.html?hybrid-pers=off&target=on",
-						"siteSection": "www.adobe.com",
-						"server": "www.adobe.com",
-						"isErrorPage": false,
-						"isHomePage": false,
-						"name": "adobe.com:products:photoshop",
-						"pageViews": {
-							"value": 0
-						}
-					},
-					"webInteraction": {
-						"name": "Martech-API",
-						"type": "other",
-						"linkClicks": {
-							"value": 1
-						}
-					},
-					"webReferrer": {
-						"URL": ""
-					}
-				},
-				"timestamp": "2025-03-14T06:11:32.624Z",
-				"eventType": "decisioning.propositionFetch"
-			},
-			"data": {
-				"__adobe": {
-					"target": {
-						"is404": false,
-						"authState": "loggedOut",
-						"hitType": "propositionFetch",
-						"isMilo": true,
-						"adobeLocale": "en-US",
-						"hasGnav": true
-					}
-				},
-				"_adobe_corpnew": {
-					"digitalData": {
-						"page": {
-							"pageInfo": {
-								"language": "en-US"
-							}
-						},
-						"diagnostic": {
-							"franklin": {
-								"implementation": "milo"
-							}
-						},
-						"previousPage": {
-							"pageInfo": {
-								"pageName": "adobe.com:products:photoshop"
-							}
-						},
-						"primaryUser": {
-							"primaryProfile": {
-								"profileInfo": {
-									"authState": "loggedOut",
-									"returningStatus": "New"
-								}
-							}
-						}
-					}
-				},
-				"marketingtech": {
-					"adobe": {
-						"alloy": {
-							"approach": "martech-API",
-							"edgeConfigIdLaunch": "913eac4d-900b-45e8-9ee7-306216765cd2",
-							"edgeConfigId": "913eac4d-900b-45e8-9ee7-306216765cd2"
-						}
-					}
+		  "xdm": {
+			...updatedContext,
+			// "identityMap": identityMap,
+			"identityMap": getOrGenerateUserId(request),
+			"web": {
+			  "webPageDetails": {
+				"URL": url.href,
+				"siteSection": url.hostname,
+				"server": url.hostname,
+				"isErrorPage": false,
+				"isHomePage": false,
+				"name": pageName,
+				"pageViews": {
+				  "value": 0
 				}
-			}
+			  },
+			  webInteraction: {
+				  name: 'Martech-API',
+				  type: 'other',
+				  linkClicks: { value: 1 },
+				},
+			  "webReferrer": {
+				"URL": request.headers.get("Referer") || ""
+			  }
+			},
+			"timestamp": new Date().toISOString(),
+			"eventType": "decisioning.propositionFetch",
+		  },
+		  "data": {
+			"__adobe": {
+			  "target": {
+				"is404": false,
+				"authState": "loggedOut",
+				"hitType": "propositionFetch",
+				"isMilo": true,
+				"adobeLocale": locale.ietf,
+				"hasGnav": true,
+			  }
+			},
+			"_adobe_corpnew": {
+			  marketingtech: { adobe: { alloy: { approach: 'martech-API' } } },
+			  "digitalData": {
+				"page": {
+				  "pageInfo": {
+					"language": locale.ietf,
+				  }
+				},
+				"diagnostic": {
+				  "franklin": {
+					"implementation": "milo"
+				  }
+				},
+				"previousPage": {
+				  "pageInfo": {
+					"pageName": prevPageName
+				  }
+				},
+				"primaryUser": {
+				  "primaryProfile": {
+					"profileInfo": {
+					  "authState": "loggedOut",
+					  "returningStatus": "Repeat",
+					}
+				  }
+				},
+			  }
+			},
+		  }
 		},
 		"query": {
-			"identity": {
-				"fetch": [
-					"ECID"
-				]
-			},
-			"personalization": {
-				"schemas": [
-					"https://ns.adobe.com/personalization/default-content-item",
-					"https://ns.adobe.com/personalization/html-content-item",
-					"https://ns.adobe.com/personalization/json-content-item",
-					"https://ns.adobe.com/personalization/redirect-item",
-					"https://ns.adobe.com/personalization/ruleset-item",
-					"https://ns.adobe.com/personalization/message/in-app",
-					"https://ns.adobe.com/personalization/message/content-card",
-					"https://ns.adobe.com/personalization/dom-action"
-				],
-				"surfaces": [
-					"web://www.adobe.com/products/photoshop.html"
-				],
-				"decisionScopes": [
-					"__view__"
-				]
-			}
+		  "identity": {
+			"fetch": [
+			  "ECID"
+			]
+		  },
+		  "personalization": {
+			"schemas": [
+			  "https://ns.adobe.com/personalization/default-content-item",
+			  "https://ns.adobe.com/personalization/html-content-item",
+			  "https://ns.adobe.com/personalization/json-content-item",
+			  "https://ns.adobe.com/personalization/redirect-item",
+			  "https://ns.adobe.com/personalization/ruleset-item",
+			  "https://ns.adobe.com/personalization/message/in-app",
+			  "https://ns.adobe.com/personalization/message/content-card",
+			  "https://ns.adobe.com/personalization/dom-action"
+			],
+			"decisionScopes": [
+			  '__view__'
+			]
+		  }
 		},
 		"meta": {
-			"target": {
-				"migration": true
+		  "target": {
+			"migration": true
+		  },
+		  "configOverrides": {
+			"com_adobe_analytics": {
+			  "reportSuites": REPORT_SUITES_ID
 			},
-			"configOverrides": {
-				"com_adobe_analytics": {
-					"reportSuites": [
-						"adbadobenonacdcprod",
-						"adbadobeprototype"
-					]
-				},
-				"com_adobe_target": {
-					"propertyToken": "4db35ee5-63ad-59f6-cec6-82ef8863b22d"
-				}
-			},
-			"state": {
-				"domain": "adobe.com",
-				"cookiesEnabled": true,
-				"entries": [
-					{
-						"key": "kndctr_9E1005A551ED61CA0A490D45_AdobeOrg_cluster",
-						"value": "jpn3"
-					},
-					{
-						"key": "kndctr_9E1005A551ED61CA0A490D45_AdobeOrg_identity",
-						"value": "CiY4OTE5OTMxNDA3MzA3Mzk2MDIwMzg1NDA0ODI3NDY0OTE4MjA2NFIRCOzxlJrZMhgBKgRKUE4zMALwAezxlJrZMg%3D%3D"
-					}
-				]
+			"com_adobe_target": {
+			  "propertyToken": AT_PROPERTY_VAL
 			}
+		  },
+		  "state": {
+			"domain": url.hostname,
+			"cookiesEnabled": true,
+			"entries": stateEntries
+		  }
 		}
+	  }
 	}
-  }
-  
-  // Get Target property based on page region
-  function getTargetPropertyBasedOnPageRegion(env, pathname) {
-	if (env !== "prod") return "bc8dfa27-29cc-625c-22ea-f7ccebfc6231"
 	
+
+  // Get Target property based on page region
+  function getTargetPropertyBasedOnPageRegion({ env, pathname }) {
+	if (env !== 'prod') return 'bc8dfa27-29cc-625c-22ea-f7ccebfc6231';
+  
 	// EMEA & LATAM
 	if (
 	  pathname.search(
 		/(\/africa\/|\/be_en\/|\/be_fr\/|\/be_nl\/|\/cis_en\/|\/cy_en\/|\/dk\/|\/de\/|\/ee\/|\/es\/|\/fr\/|\/gr_en\/|\/ie\/|\/il_en\/|\/it\/|\/lv\/|\/lu_de\/|\/lu_en\/|\/lu_fr\/|\/hu\/|\/mt\/|\/mena_en\/|\/nl\/|\/no\/|\/pl\/|\/pt\/|\/ro\/|\/ch_de\/|\/si\/|\/sk\/|\/ch_fr\/|\/fi\/|\/se\/|\/ch_it\/|\/tr\/|\/uk\/|\/at\/|\/cz\/|\/bg\/|\/ru\/|\/cis_ru\/|\/ua\/|\/il_he\/|\/mena_ar\/|\/lt\/|\/sa_en\/|\/ae_en\/|\/ae_ar\/|\/sa_ar\/|\/ng\/|\/za\/|\/qa_ar\/|\/eg_en\/|\/eg_ar\/|\/kw_ar\/|\/eg_ar\/|\/qa_en\/|\/kw_en\/|\/gr_el\/|\/br\/|\/cl\/|\/la\/|\/mx\/|\/co\/|\/ar\/|\/pe\/|\/gt\/|\/pr\/|\/ec\/|\/cr\/)/,
 	  ) !== -1
 	) {
-	  return "488edf5f-3cbe-f410-0953-8c0c5c323772"
+	  return '488edf5f-3cbe-f410-0953-8c0c5c323772';
 	}
-  
-	// APAC
-	if (
+	if ( // APAC
 	  pathname.search(
 		/(\/au\/|\/hk_en\/|\/in\/|\/nz\/|\/sea\/|\/cn\/|\/hk_zh\/|\/tw\/|\/kr\/|\/sg\/|\/th_en\/|\/th_th\/|\/my_en\/|\/my_ms\/|\/ph_en\/|\/ph_fil\/|\/vn_en\/|\/vn_vi\/|\/in_hi\/|\/id_id\/|\/id_en\/)/,
 	  ) !== -1
 	) {
-	  return "3de509ee-bbc7-58a3-0851-600d1c2e2918"
+	  return '3de509ee-bbc7-58a3-0851-600d1c2e2918';
 	}
-  
 	// JP
-	if (pathname.indexOf("/jp/") !== -1) {
-	  return "ba5bc9e8-8fb4-037a-12c8-682384720007"
+	if (pathname.indexOf('/jp/') !== -1) {
+	  return 'ba5bc9e8-8fb4-037a-12c8-682384720007';
 	}
   
-	return "4db35ee5-63ad-59f6-cec6-82ef8863b22d" // Default US property
+	return '4db35ee5-63ad-59f6-cec6-82ef8863b22d'; // Default
   }
   
   // Process personalization data from Adobe Target response

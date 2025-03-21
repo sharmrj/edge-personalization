@@ -13,7 +13,8 @@
 	// https://main--cc--adobecom.aem.page/drafts/akansha/photoshop
 	"routes": [
 		{
-			"pattern": "main--cc--adobecom.aem.page/*",
+			// "pattern": "main--cc--adobecom.aem.page/*",
+			"pattern": "main--cc--adobecom.aem.page/drafts/akansha/photoshop",
 			"zone_name": "main--cc--adobecom.aem.page"
 		},
 		{

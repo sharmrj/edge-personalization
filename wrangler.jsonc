@@ -10,17 +10,18 @@
 	"observability": {
 		"enabled": true
 	},
+	
 	// https://main--cc--adobecom.aem.page/drafts/akansha/photoshop
 	"routes": [
 		{
 			// "pattern": "main--cc--adobecom.aem.page/*",
 			"pattern": "main--cc--adobecom.aem.page/drafts/akansha/photoshop",
 			"zone_name": "main--cc--adobecom.aem.page"
-		},
-		{
-			"pattern": "subdomain.example.com/*",
-			"zone_id": "<YOUR_ZONE_ID>"
 		}
+		// {
+		// 	"pattern": "subdomain.example.com/*",
+		// 	"zone_id": "<YOUR_ZONE_ID>"
+		// }
 	]
 	/**
 	 * Smart Placement

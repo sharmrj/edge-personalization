@@ -1,6 +1,12 @@
 import { ProcessedData } from "./target/target";
 
-export const constructRewriter = async (data: ProcessedData) => {
+const COMMANDS_KEYS = {
+  remove: 'remove',
+  replace: 'replace',
+  updateAttribute: 'updateattribute',
+};
+
+export const rewrite = async (response: Response, data: ProcessedData): Promise<Response> => {
   const transformedData = await Promise.all(
     data?.commands?.map(async (cmd) => {
       // let modified = modifySelectorTerm(cmd.selector);
@@ -50,7 +56,7 @@ export const constructRewriter = async (data: ProcessedData) => {
       },
     });
   }
-  return rewriter;
+  return rewriter.transform(response);
 };
 
 function modifyNonFragmentSelector(selector, action) {
@@ -78,6 +84,51 @@ function modifyNonFragmentSelector(selector, action) {
     modifiers,
     attribute,
   };
+}
+
+function modifySelectorTerm(termParam) {
+  let term = termParam;
+  const specificSelectors = {
+    section: 'main > div',
+    'primary-cta': 'strong a',
+    'secondary-cta': 'em a',
+    'action-area': '*:has(> em a, > strong a)',
+    'any-marquee-section': 'main > div:has([class*="marquee"])',
+    'any-marquee': '[class*="marquee"]',
+    'any-header': ':is(h1, h2, h3, h4, h5, h6)',
+  };
+  const otherSelectors = ['row', 'col'];
+  const htmlEls = [
+    'html', 'body', 'header', 'footer', 'main',
+    'div', 'a', 'p', 'strong', 'em', 'picture', 'source', 'img', 'h',
+    'ul', 'ol', 'li',
+  ];
+  const startTextMatch = term.match(/^[a-zA-Z/./-]*/);
+  const startText = startTextMatch ? startTextMatch[0].toLowerCase() : '';
+  const startTextPart1 = startText.split(/\.|:/)[0];
+  const endNumberMatch = term.match(/[0-9]*$/);
+  const endNumber = endNumberMatch && startText.match(/^[a-zA-Z]/) ? endNumberMatch[0] : '';
+  if (!startText || htmlEls.includes(startText)) return term;
+  const updateEndNumber = (endNumber, term) => (endNumber
+    ? term.replace(endNumber, `:nth-child(${endNumber})`)
+    : term);
+  if (otherSelectors.includes(startText)) {
+    term = term.replace(startText, '> div');
+    term = updateEndNumber(endNumber, term);
+    return term;
+  }
+  if (Object.keys(specificSelectors).includes(startTextPart1)) {
+    term = term.replace(startTextPart1, specificSelectors[startTextPart1]);
+    term = updateEndNumber(endNumber, term);
+    return term;
+  }
+
+  if (!startText.startsWith('.')) term = `.${term}`;
+  if (endNumber) {
+    term = term.replace(endNumber, '');
+    term = `${term}:nth-child(${endNumber} of ${term})`;
+  }
+  return term;
 }
 
 function getModifiers(selector) {

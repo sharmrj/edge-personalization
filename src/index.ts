@@ -1,14 +1,15 @@
-import { constructRewriter } from "./rewriter";
+import { rewrite } from "./rewriter";
 import { getPersonalizationData } from "./target/target";
 import { shouldPersonalize } from "./utils";
 
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
+	async fetch(request: Request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 		const cacheKey = new Request(url.toString(), request);
 		const cache = caches.default;
 
 		let response: Response = await cache.match(cacheKey);
+		if (response) response = new Response(response.body, response);
 		if (!response) {
 			response = await fetch(request);
 			response = new Response(response.body, response);
@@ -16,7 +17,8 @@ export default {
 			response.headers.append("Cache-Control", "s-maxage-86400");
 			// Non blocking
 			// Also see: https://developers.cloudflare.com/workers/runtime-apis/context
-			ctx.waitUntil(cache.put(cacheKey, response.clone()));
+			if (request.method === "GET")
+				ctx.waitUntil(cache.put(cacheKey, response.clone()));
 		}
 		// we're not caching anything on akamai right now,
 		// but we should only not cache personalized pages
@@ -36,8 +38,7 @@ async function personalize(request: Request, response: Response): Promise<Respon
 	try {
 		const personalizationData = await getPersonalizationData(request);
 		console.log("Rewriting HTML");
-		const rewriter = constructRewriter(personalizationData);
-		return rewriter.transform(response);
+		return rewrite(response, personalizationData);
 	} catch (e) {
 		console.error(e);
 		return response;

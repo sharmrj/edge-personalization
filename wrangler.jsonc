@@ -14,7 +14,7 @@
 	"routes": [
 		{
 			// "pattern": "main--cc--adobecom.aem.page/*",
-			"pattern": "artemis-zero.xyz",
+			"pattern": "artemis-zero.xyz/*",
 			"zone_name": "artemis-zero.xyz"
 		}
 		// {

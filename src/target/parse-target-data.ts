@@ -3,10 +3,8 @@ import { ProcessedData } from "./target";
 export function parseRawData(targetData: unknown): ProcessedData {
   // Extract personalization decisions
   const propositions = targetData?.handle?.find(d => d.type === "personalization:decisions")?.payload || []
-  console.log("Propositions:", propositions);
 
   if (propositions.length === 0) {
-    console.log("No propositions found in Target response")
     return { fragments: [], commands: [] }
   }
 

@@ -36,7 +36,10 @@ export default {
 
 async function personalize(request: Request, response: Response): Promise<Response> {
 	try {
+		const persStart = performance.now();
 		const personalizationData = await getPersonalizationData(request);
+		const persEnd = performance.now();
+		console.log(`Getting and Parsing Personalization Data Took ${persEnd - persStart}ms`);
 		console.log("Rewriting HTML");
 		return rewrite(response, personalizationData);
 	} catch (e) {

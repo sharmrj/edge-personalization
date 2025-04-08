@@ -72,11 +72,6 @@ function getUpdatedContext({
 	};
 }
 
-//   const getMartechCookies = () => document.cookie.split(';')
-//   .map((x) => x.trim().split('='))
-//   .filter(([key]) => KNDCTR_COOKIE_KEYS.includes(key))
-//   .map(([key, value]) => ({ key, value }));
-
 async function handleRequest(request) {
 	try {
 		const url = new URL(request.url);
@@ -491,6 +486,8 @@ async function fetchPersonalizationData({ locale, env, request, url }) {
 			},
 		}
 
+		const isSignedIn = true;
+
 		// Get page name for analytics
 		const pageName = `${locale.ietf}:${url.pathname.replace(/^\//, "").replace(/\/$/, "") || "home"}`
 
@@ -503,6 +500,7 @@ async function fetchPersonalizationData({ locale, env, request, url }) {
 			url,
 			request,
 			DATA_STREAM_ID,
+			isSignedIn
 		})
 		console.log("Request payload:", JSON.stringify(requestBody, null, 2));
 
@@ -525,8 +523,117 @@ async function fetchPersonalizationData({ locale, env, request, url }) {
 	}
 }
 
+const getVisitorStatus = ({
+	expiryDays = 30,
+	cookieName = 's_nr',
+	domain = `.${(new URL(window.location.origin)).hostname}`,
+  }) => {
+	const currentTime = new Date().getTime();
+	const cookieValue = getCookie(cookieName) || '';
+	const cookieAttributes = { expires: new Date(currentTime + expiryDays * 24 * 60 * 60 * 1000) };
+  
+	if (domain) {
+	  cookieAttributes.domain = domain;
+	}
+  
+	if (!cookieValue) {
+	  setCookie(cookieName, `${currentTime}-New`, cookieAttributes);
+	  return 'New';
+	}
+  
+	const [storedTime, storedState] = cookieValue.split('-').map((value) => value.trim());
+  
+	if (currentTime - storedTime < 30 * 60 * 1000 && storedState === 'New') {
+	  setCookie(cookieName, `${currentTime}-New`, cookieAttributes);
+	  return 'New';
+	}
+  
+	setCookie(cookieName, `${currentTime}-Repeat`, cookieAttributes);
+	return 'Repeat';
+  };
+
+function getEntitlementCreativeCloud(profile) {
+	const { scope } = window.adobeIMS.adobeIdData;
+	if (
+	  scope
+	  && scope.indexOf('creative_cloud') !== -1
+	  && profile
+	  && profile.serviceAccounts
+	) {
+	  const serviceAccount = profile.serviceAccounts.find(
+		(sa) => sa.serviceCode === 'creative_cloud',
+	  );
+  
+	  if (!serviceAccount) {
+		return 'notEntitled';
+	  }
+  
+	  if (serviceAccount.serviceLevel === 'CS_LVL_2') {
+		return 'paid';
+	  } if (serviceAccount.serviceLevel === 'CS_LVL_1') {
+		return 'free';
+	  }
+	  return 'notEntitled';
+	}
+	return 'notEntitled';
+  }
+  
+  function getEntitlementStatusCreativeCloud(profile) {
+	const { scope } = window.adobeIMS.adobeIdData;
+	if (
+	  scope
+	  && scope.indexOf('creative_cloud') !== -1
+	  && profile
+	  && profile.serviceAccounts
+	) {
+	  const serviceAccount = profile.serviceAccounts.find(
+		(sa) => sa.serviceCode === 'creative_cloud',
+	  );
+	  return serviceAccount?.serviceStatus || 'none';
+	}
+	return 'none';
+  }
+  
+
+async function createProfileInfo(profile, returningStatus) {
+	console.log(profile);
+	const adobeIMSUserProfile = {
+	  account_type: profile?.account_type || 'unknown',
+	  preferred_languages: profile?.preferred_languages || null,
+	  countryCode: profile?.countryCode || 'unknown',
+	  toua: profile?.toua || 'unknown',
+	  email: sha256(profile?.email?.toLowerCase() || 'unknown'),
+	  first_name: sha256(profile?.first_name?.toLowerCase() || 'unknown'),
+	  last_name: sha256(profile?.last_name?.toLowerCase() || 'unknown'),
+	  phoneNumber: sha256(profile?.phoneNumber?.replace('+', '') || 'unknown'),
+	  roles: profile?.roles || [],
+	  tags: profile?.tags || [],
+	};
+	console.log(adobeIMSUserProfile);
+  
+	return {
+	  authState: 'authenticated',
+	  entitlementCreativeCloud: await getEntitlementCreativeCloud(profile),
+	  entitlementStatusCreativeCloud: await getEntitlementStatusCreativeCloud(profile),
+	  returningStatus: returningStatus || 'Repeat',
+	  profileID: profile?.userId?.split('@')[0] || 'unknown',
+	  authID: profile?.authId?.split('@')[0] || 'unknown',
+	  fullProfileID: profile?.userId || 'unknown',
+	  fullAuthID: profile?.authId || 'unknown',
+	  adobeIMSUserProfile,
+	};
+  }
+  
+async function getProfileInfo() {
+	const profile = await window.adobeIMS.getProfile();
+	const returningStatus = getVisitorStatus(365, 's_nr', getDomain());
+	console.log(returningStatus);
+	return createProfileInfo(profile, returningStatus);
+  }
+
+
 // Create request payload for Adobe Target
-function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID }) {
+function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID, isSignedIn }) {
 	const cookies = getCookiesFromRequest(request)
 	const prevPageName = cookies['gpv']
 	// const martechCookie = cookies[KNDCTR_COOKIE_KEYS]
@@ -574,6 +681,10 @@ function createRequestPayload({ updatedContext, pageName, locale, env, url, requ
 	const stateEntries = Object.entries(cookies)
 		.filter(([key]) => KNDCTR_COOKIE_KEYS.includes(key))
 		.map(([key, value]) => ({ key, value }))
+
+	const primaryUser = isSignedIn
+	? { primaryProfile: { profileInfo: getProfileInfo() } }
+	: { primaryProfile: { profileInfo: { authState: 'loggedOut', returningStatus: getVisitorStatus({}) } } };
 
 	return {
 		"event": {
@@ -634,14 +745,15 @@ function createRequestPayload({ updatedContext, pageName, locale, env, url, requ
 								"pageName": prevPageName
 							}
 						},
-						"primaryUser": {
-							"primaryProfile": {
-								"profileInfo": {
-									"authState": "loggedOut",
-									"returningStatus": "Repeat",
-								}
-							}
-						},
+						// "primaryUser": {
+						// 	"primaryProfile": {
+						// 		"profileInfo": {
+						// 			"authState": "loggedOut",
+						// 			"returningStatus": "Repeat",
+						// 		}
+						// 	}
+						// },
+						primaryUser,
 					}
 				},
 			}

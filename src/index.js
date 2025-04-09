@@ -523,13 +523,30 @@ async function fetchPersonalizationData({ locale, env, request, url }) {
 	}
 }
 
-const getVisitorStatus = ({
+function setCookie(domain, key, value, options = {}) {
+	const expires = options.expires || 730;
+	const date = new Date();
+	date.setTime(date.getTime() + expires * 24 * 60 * 60 * 1000);
+	const expiresString = `expires=${date.toUTCString()}`;
+  
+	const cookie = `${key}=${value}; ${expiresString}; path=/ ; domain=.${domain};`;
+	return cookie;
+  }
+
+  const getVisitorStatus = ({
+	request,
+	domain,
 	expiryDays = 30,
 	cookieName = 's_nr',
-	domain = `.${(new URL(window.location.origin)).hostname}`,
+	// domain = `.${(new URL(window.location.origin)).hostname}`,
   }) => {
-	const currentTime = new Date().getTime();
-	const cookieValue = getCookie(cookieName) || '';
+	const currentTime = Date.now();
+	const cookies = getCookiesFromRequest(request);
+	const cookieValue = cookies[cookieName];
+	let visitorStatus;
+	let cookie;
+  
+	// const cookieValue = getCookie(cookieName) || '';
 	const cookieAttributes = { expires: new Date(currentTime + expiryDays * 24 * 60 * 60 * 1000) };
   
 	if (domain) {
@@ -537,20 +554,58 @@ const getVisitorStatus = ({
 	}
   
 	if (!cookieValue) {
-	  setCookie(cookieName, `${currentTime}-New`, cookieAttributes);
-	  return 'New';
+	  cookie = setCookie(domain, cookieName, `${currentTime}-New`, cookieAttributes);
+	  visitorStatus = 'New';
 	}
   
 	const [storedTime, storedState] = cookieValue.split('-').map((value) => value.trim());
   
 	if (currentTime - storedTime < 30 * 60 * 1000 && storedState === 'New') {
-	  setCookie(cookieName, `${currentTime}-New`, cookieAttributes);
-	  return 'New';
+		cookie = setCookie(domain, cookieName, `${currentTime}-New`, cookieAttributes);
+		visitorStatus = 'New';
 	}
   
-	setCookie(cookieName, `${currentTime}-Repeat`, cookieAttributes);
-	return 'Repeat';
+	cookie = setCookie(domain, cookieName, `${currentTime}-Repeat`, cookieAttributes);
+	visitorStatus = 'Repeat';
+
+	return {
+		visitorStatus,
+		cookie,
+	};
   };
+// const getVisitorStatus = ({
+// 	request,
+// 	domain,
+// 	expiryDays = 30,
+// 	cookieName = 's_nr',
+// 	// domain = `.${(new URL(window.location.origin)).hostname}`,
+//   }) => {
+// 	const currentTime = Date.now();
+// 	const cookies = getCookiesFromRequest(request);
+// 	const cookieValue = cookies[cookieName];
+  
+// 	// const cookieValue = getCookie(cookieName) || '';
+// 	const cookieAttributes = { expires: new Date(currentTime + expiryDays * 24 * 60 * 60 * 1000) };
+  
+// 	if (domain) {
+// 	  cookieAttributes.domain = domain;
+// 	}
+  
+// 	if (!cookieValue) {
+// 	  setCookie(domain, cookieName, `${currentTime}-New`, cookieAttributes);
+// 	  return 'New';
+// 	}
+  
+// 	const [storedTime, storedState] = cookieValue.split('-').map((value) => value.trim());
+  
+// 	if (currentTime - storedTime < 30 * 60 * 1000 && storedState === 'New') {
+// 	  setCookie(domain, cookieName, `${currentTime}-New`, cookieAttributes);
+// 	  return 'New';
+// 	}
+  
+// 	setCookie(domain, cookieName, `${currentTime}-Repeat`, cookieAttributes);
+// 	return 'Repeat';
+//   };
 
 function getEntitlementCreativeCloud(profile) {
 	const { scope } = window.adobeIMS.adobeIdData;
@@ -624,16 +679,17 @@ async function createProfileInfo(profile, returningStatus) {
 	};
   }
   
-async function getProfileInfo() {
+async function getProfileInfo(request, url) {
 	const profile = await window.adobeIMS.getProfile();
-	const returningStatus = getVisitorStatus(365, 's_nr', getDomain());
+	// const returningStatus = getVisitorStatus(url, 365, 's_nr', getDomain(url));
+	const returningStatus = getVisitorStatus({ request, domain: url.hostname }).visitorStatus;
 	console.log(returningStatus);
 	return createProfileInfo(profile, returningStatus);
   }
 
 
 // Create request payload for Adobe Target
-function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID, isSignedIn }) {
+async function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID, isSignedIn }) {
 	const cookies = getCookiesFromRequest(request)
 	const prevPageName = cookies['gpv']
 	// const martechCookie = cookies[KNDCTR_COOKIE_KEYS]
@@ -683,8 +739,8 @@ function createRequestPayload({ updatedContext, pageName, locale, env, url, requ
 		.map(([key, value]) => ({ key, value }))
 
 	const primaryUser = isSignedIn
-	? { primaryProfile: { profileInfo: getProfileInfo() } }
-	: { primaryProfile: { profileInfo: { authState: 'loggedOut', returningStatus: getVisitorStatus({}) } } };
+	? { primaryProfile: { profileInfo: await getProfileInfo(url) } }
+	: { primaryProfile: { profileInfo: { authState: 'loggedOut', returningStatus: getVisitorStatus({ request, domain: url.hostname }).visitorStatus } } };
 
 	return {
 		"event": {
@@ -1136,12 +1192,14 @@ async function applyPersonalizationWithHTMLRewriter(response, commands, url) {
 	await handleCommands(commands, rewriter);
 
 	const transformedResponse = rewriter.transform(response)
+	const cookie = getVisitorStatus({ request, domain: url.hostname }).cookie;
 
 	const newHeaders = new Headers(transformedResponse.headers)
 	console.log("New Headers:", newHeaders);
 	Object.keys(corsHeaders).forEach(key => {
 		newHeaders.set(key, corsHeaders[key])
 	})
+	newHeaders.set('Set-Cookie', cookie)
 	newHeaders.set("x-edge-personalized", "true")
 	console.log("New Headers:", newHeaders);
 

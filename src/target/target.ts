@@ -1,15 +1,16 @@
+import { AuthState } from "../authenticate/authenticate";
 import { determineLocale } from "../utils";
 import { parseRawData } from "./parse-target-data";
 
 export type ProcessedData = { [key: string]: unknown };
 
-export async function getPersonalizationData(request: Request): Promise<ProcessedData> {
+export async function getPersonalizationData(request: Request, authState: AuthState): Promise<ProcessedData> {
   console.log("Making Interact Call");
-  const rawData = await fetchPersonalizationData(request);
+  const rawData = await fetchPersonalizationData(request, authState);
   return parseRawData(rawData);
 }
 
-async function fetchPersonalizationData(request: Request): Promise<unknown> {
+async function fetchPersonalizationData(request: Request, authState): Promise<unknown> {
   const url = new URL(request.url);
   const env = [
     "stage",
@@ -72,6 +73,7 @@ async function fetchPersonalizationData(request: Request): Promise<unknown> {
     url,
     request,
     DATA_STREAM_ID,
+    authState,
   })
 
   // Make the request to Adobe Target
@@ -88,7 +90,7 @@ async function fetchPersonalizationData(request: Request): Promise<unknown> {
 };
 
 // Create request payload for Adobe Target
-function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID }) {
+function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID, authState }) {
   const cookieHeader = request.headers.get("Cookie") || ""
   const cookies = {}
 
@@ -206,10 +208,11 @@ function createRequestPayload({ updatedContext, pageName, locale, env, url, requ
             },
             "primaryUser": {
               "primaryProfile": {
-                "profileInfo": {
+                "profileInfo": authState.data,
+                /*"profileInfo": {
                   "authState": "loggedOut",
                   "returningStatus": "Repeat",
-                }
+                }*/
               }
             },
           }

@@ -1,9 +1,14 @@
+import { authenticate } from "./authenticate/authenticate";
 import { rewrite } from "./rewriter";
 import { getPersonalizationData } from "./target/target";
 import { shouldPersonalize } from "./utils";
 
+export interface Env {
+  CLIENT_SECRET: string;
+};
+
 export default {
-	async fetch(request: Request, env, ctx): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 		const cacheKey = new Request(url.toString(), request);
 		const cache = caches.default;
@@ -29,15 +34,16 @@ export default {
 		// Pragma is deprecated, but the akamai documentation still
 		// mentions it: https://techdocs.akamai.com/property-mgr/docs/caching-2#no-store
 		response.headers.set("Pragma", "no-cache");
-		if (shouldPersonalize(request)) return personalize(request, response);
+		if (shouldPersonalize(request)) return personalize(request, env, response);
 		return response;
 	}
 }
 
-async function personalize(request: Request, response: Response): Promise<Response> {
+async function personalize(request: Request, env: Env, response: Response): Promise<Response> {
 	try {
+    const authState = await authenticate(request, env);
 		const persStart = performance.now();
-		const personalizationData = await getPersonalizationData(request);
+		const personalizationData = await getPersonalizationData(request, authState);
 		const persEnd = performance.now();
 		console.log(`Getting and Parsing Personalization Data Took ${persEnd - persStart}ms`);
 		console.log("Rewriting HTML");

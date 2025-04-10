@@ -20,7 +20,7 @@ type LoggedInData = {
   authID: string | 'unknown';
   fullProfileID: string | 'unknown';
   fullAuthID: string | 'unknown';
-  AdobeIMSUserProfile: AdobeIMSUserProfile;
+  adobeIMSUserProfile: AdobeIMSUserProfile;
 };
 
 type ServiceStatus = unknown;
@@ -55,25 +55,47 @@ export const authenticate = async (request: Request, env: Env): Promise<AuthStat
   const profile = await getProfile(token, env.CLIENT_SECRET);
   if (!profile) return loggedOut;
   console.log(profile);
-  return loggedOut;
+
+  const adobeIMSUserProfile: AdobeIMSUserProfile = {
+    account_type: profile.account_type ?? "unknown",
+    preferred_languages: profile.preferred_languages ?? null,
+    countryCode: profile.countryCode ?? "unknown",
+    toua: "unknown",
+    email: profile.email ?? "unknown",
+    first_name: profile.first_name ?? "unknown",
+    last_name: profile.last_name ?? "unknown",
+    phoneNumber: profile.phoneNumber ?? "unknown",
+    roles: profile.roles ?? [],
+    tags: profile.tags ?? [],
+  }
+  return {
+    type: "LoggedIn",
+    data: {
+      authState: "authenticated",
+      entitlementCreativeCloud: "notEntitled",
+      entitlementStatusCreativeCloud: "none",
+      returningStatus: "New", // Todo
+      profileID: profile.userId ?? 'unknown',
+      authID: profile.authId ?? "unknown",
+      fullProfileID: profile.userId ?? "unknown",
+      fullAuthID: profile.authId ?? "unknown",
+      adobeIMSUserProfile,
+    }
+  } as LoggedIn;
 };
 
 const getToken = async (aux_sid: string, client_secret: string): Promise<string | null> => {
   try {
-    const data = {
-      grant_type: "aux_sid_exchange",
-      client_id: "edge-p13n",
-      client_secret,
-      aux_sid,
-      scope: "openid,AdobeID,additional_info.roles",
-    };
-    const response = await fetch(`${base}/ims/token/v3`, {
-      method: "POST",
-      body: JSON.stringify(data),
+    const response =await fetch('https://adobeid-na1.services.adobe.com/ims/token/v3', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded'
+      },
+      body: `grant_type=aux_sid_exchange&client_id=edge-p13n&client_secret=${client_secret}&aux_sid=${aux_sid}&scope=openid,AdobeID,additional_info.roles`,
     });
     if (!response.ok) throw new Error(`Token response not ok: ${JSON.stringify(response)}`);
     const json = await response.json();
-  return json.access_token ?? null;
+    return json.access_token ?? null;
   } catch (e) {
     console.error(e);
     return null;
@@ -89,7 +111,7 @@ const getProfile = async (token: string, client_secret: string): Promise< {[key:
         'Authorization': `Bearer ${token}`,
       },
     });
-    if (!response.ok) throw new Error(`Token response not ok: ${JSON.stringify(response)}`);
+    if (!response.ok) throw new Error(`Profile response not ok: ${JSON.stringify(response)}`);
     const json = await response.json();
     return json;
   } catch (e) {

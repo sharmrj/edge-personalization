@@ -8,12 +8,14 @@ export interface Env {
   CLIENT_SECRET: string;
 };
 
+const PROD_COOKIE_DOMAIN = '.adobe.com';
+
 export default {
 	async fetch(request: Request, env: Env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 		const cacheKey = new Request(url.toString(), request);
 		const cache = caches.default;
-		const cookie = getVisitorStatus({ request, domain: url.hostname }).cookie;
+		const cookie = getVisitorStatus({ request, domain: PROD_COOKIE_DOMAIN }).cookie;
 
 		let response: Response = await cache.match(cacheKey);
 		if (response) response = new Response(response.body, response);

@@ -14,8 +14,8 @@
 	"routes": [
 		{
 			// "pattern": "main--cc--adobecom.aem.page/*",
-			"pattern": "artemis-dontuse.deno.dev/products/*",
-			"zone_name": "artemis-dontuse.deno.dev"
+			"pattern": "artemis-zero.xyz/products/*",
+			"zone_name": "artemis-zero.xyz"
 		}
 		// {
 		// 	"pattern": "subdomain.example.com/*",

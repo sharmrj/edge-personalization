@@ -632,7 +632,51 @@ function getEntitlementCreativeCloud(profile) {
 	}
 	return 'notEntitled';
   }
-  
+
+  const sha256 = function (b) {
+  function c(a, b) {
+    return (a >>> b) | (a << (32 - b));
+  }
+  for (
+    var d, e, f = Math.pow, g = 2 ** 32, h = 'length', i = '', j = [], k = 8 * b[h], l = sha256.h = sha256.h || [], m = sha256.k = sha256.k || [], n = m[h], o = {}, p = 2;
+    n < 64;
+    p++
+  ) {
+    if (!o[p]) {
+      for (d = 0; d < 313; d += p) o[d] = p;
+      l[n] = p ** 0.5 * g | 0;
+      m[n++] = p ** (1 / 3) * g | 0;
+    }
+  }
+  for (b += '\x80'; b[h] % 64 - 56;) b += '\x00';
+  for (d = 0; d < b[h]; d++) {
+    if (((e = b.charCodeAt(d)), e >> 8)) return;
+    j[d >> 2] |= e << ((3 - d) % 4) * 8;
+  }
+  for (j[j[h]] = k / g | 0, j[j[h]] = k, e = 0; e < j[h];) {
+    const q = j.slice(e, (e += 16)); const
+      r = l;
+    for (l = l.slice(0, 8), d = 0; d < 64; d++) {
+      const s = q[d - 15];
+      const t = q[d - 2];
+      const u = l[0];
+      const v = l[4];
+      const w = l[7] + (c(v, 6) ^ c(v, 11) ^ c(v, 25)) + ((v & l[5]) ^ (~v & l[6])) + m[d] + (q[d] = d < 16 ? q[d] : (q[d - 16] + (c(s, 7) ^ c(s, 18) ^ (s >>> 3)) + q[d - 7] + (c(t, 17) ^ c(t, 19) ^ (t >>> 10))) | 0);
+      const x = (c(u, 2) ^ c(u, 13) ^ c(u, 22)) + ((u & l[1]) ^ (u & l[2]) ^ (l[1] & l[2]));
+      l = [w + x | 0].concat(l);
+      l[4] = l[4] + w | 0;
+    }
+    for (d = 0; d < 8; d++) l[d] = l[d] + r[d] | 0;
+  }
+  for (d = 0; d < 8; d++) {
+    for (e = 3; e + 1; e--) {
+      const y = (l[d] >> (8 * e)) & 255;
+      i += (y < 16 ? 0 : '') + y.toString(16);
+    }
+  }
+  return i;
+};
+
   function getEntitlementStatusCreativeCloud(profile) {
 	const { scope } = window.adobeIMS.adobeIdData;
 	if (

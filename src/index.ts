@@ -2,6 +2,7 @@ import { authenticate } from "./authenticate/authenticate";
 import { rewrite } from "./rewriter";
 import { getPersonalizationData } from "./target/target";
 import { shouldPersonalize } from "./utils";
+import { getVisitorStatus } from "./target/target";
 
 export interface Env {
   CLIENT_SECRET: string;
@@ -12,6 +13,7 @@ export default {
 		const url = new URL(request.url);
 		const cacheKey = new Request(url.toString(), request);
 		const cache = caches.default;
+		const cookie = getVisitorStatus({ request, domain: url.hostname }).cookie;
 
 		let response: Response = await cache.match(cacheKey);
 		if (response) response = new Response(response.body, response);
@@ -31,6 +33,7 @@ export default {
 		response.headers.delete("Cache-Control");
 		response.headers.set("Expires", "0");
 		response.headers.set("Cache-Control", "max-age=0, no-store, no-cache");
+		response.headers.set('Set-Cookie', cookie);
 		// Pragma is deprecated, but the akamai documentation still
 		// mentions it: https://techdocs.akamai.com/property-mgr/docs/caching-2#no-store
 		response.headers.set("Pragma", "no-cache");

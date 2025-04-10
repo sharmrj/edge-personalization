@@ -1,4 +1,8 @@
 import { Env } from "..";
+import { getEntitlementCreativeCloud } from "../target/target";
+import { getEntitlementStatusCreativeCloud } from "../target/target";
+import { getVisitorStatus } from "../target/target";
+import { sha256 } from "../target/target";
 
 export type AuthState = LoggedIn | LoggedOut
 type LoggedIn = {
@@ -30,10 +34,10 @@ type AdobeIMSUserProfile = {
   preferred_languages: string[] | null;
   countryCode: string | 'unknown';
   toua: string | 'unknown';
-  email: string | 'unknown';
-  first_name: string | 'unknown';
-  last_name: string | 'unknown';
-  phoneNumber: string | 'unknown';
+  email: string[] | 'unknown'; 
+  first_name: string[] | 'unknown';
+  last_name: string[] | 'unknown';
+  phoneNumber: string[] | 'unknown';
   roles: string[];
   tags: string[];
 };
@@ -58,32 +62,33 @@ export const authenticate = async (request: Request, env: Env): Promise<AuthStat
   const profileStart = performance.now();
   const profile = await getProfile(token, env.CLIENT_SECRET);
   const profileEnd = performance.now();
+  const scope = "openid,AdobeID,additional_info.roles";
   console.log(`Profile request took: ${profileEnd - profileStart}ms`);
   if (!profile) return loggedOut;
 
   const adobeIMSUserProfile: AdobeIMSUserProfile = {
-    account_type: profile.account_type ?? "unknown",
-    preferred_languages: profile.preferred_languages ?? null,
-    countryCode: profile.countryCode ?? "unknown",
-    toua: "unknown",
-    email: profile.email ?? "unknown",
-    first_name: profile.first_name ?? "unknown",
-    last_name: profile.last_name ?? "unknown",
-    phoneNumber: profile.phoneNumber ?? "unknown",
-    roles: profile.roles ?? [],
-    tags: profile.tags ?? [],
+    account_type: profile?.account_type ?? "unknown",
+    preferred_languages: profile?.preferred_languages ?? null,
+    countryCode: profile?.countryCode ?? "unknown",
+    toua: profile?.toua ?? "unknown",
+    email: sha256(profile?.email.toLowerCase() ?? "unknown"),
+    first_name: sha256(profile?.first_name.toLowerCase() ?? "unknown"),
+    last_name: sha256(profile?.last_name.toLowerCase() ?? "unknown"),
+    phoneNumber: sha256(profile?.phoneNumber?.replace('+', '') ?? "unknown"),
+    roles: profile?.roles ?? [],
+    tags: profile?.tags ?? [],
   }
   return {
     type: "LoggedIn",
     data: {
       authState: "authenticated",
-      entitlementCreativeCloud: "notEntitled",
-      entitlementStatusCreativeCloud: "none",
-      returningStatus: "New", // Todo
-      profileID: profile.userId ?? 'unknown',
-      authID: profile.authId ?? "unknown",
-      fullProfileID: profile.userId ?? "unknown",
-      fullAuthID: profile.authId ?? "unknown",
+      entitlementCreativeCloud: await getEntitlementCreativeCloud(profile, scope),
+      entitlementStatusCreativeCloud: await getEntitlementStatusCreativeCloud(profile, scope),
+      returningStatus: getVisitorStatus({ request }).visitorStatus || "Repeat", 
+      profileID: profile?.userId?.split('@')[0] ?? 'unknown',
+      authID: profile?.authId?.split('@')[0] ?? "unknown",
+      fullProfileID: profile?.userId ?? "unknown",
+      fullAuthID: profile?.authId ?? "unknown",
       adobeIMSUserProfile,
     }
   } as LoggedIn;

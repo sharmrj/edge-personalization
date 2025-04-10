@@ -379,7 +379,7 @@ function setCookie(domain, key, value, options = {}) {
 	const date = new Date();
 	date.setTime(date.getTime() + expires * 24 * 60 * 60 * 1000);
 	const expiresString = `expires=${date.toUTCString()}`;
-  
+
 	const cookie = `${key}=${value}; ${expiresString}; path=/ ; domain=.${domain};`;
 	return cookie;
   }
@@ -388,10 +388,10 @@ function setCookie(domain, key, value, options = {}) {
 	request,
 	expiryDays = 30,
 	cookieName = 's_nr',
+  domain,
 	// domain = `.${(new URL(window.location.origin)).hostname}`,
   }) => {
   const url = new URL(request.url);
-  const domain = url.hostname;
 	const currentTime = Date.now();
 
   const cookieHeader = request.headers.get("Cookie") || ""
@@ -408,26 +408,26 @@ function setCookie(domain, key, value, options = {}) {
 	const cookieValue = cookies[cookieName];
 	let visitorStatus;
 	let cookie;
-  
+
 	// const cookieValue = getCookie(cookieName) || '';
 	const cookieAttributes = { expires: new Date(currentTime + expiryDays * 24 * 60 * 60 * 1000) };
-  
+
 	if (domain) {
 	  cookieAttributes.domain = domain;
 	}
-  
+
 	if (!cookieValue) {
 	  cookie = setCookie(domain, cookieName, `${currentTime}-New`, cookieAttributes);
 	  visitorStatus = 'New';
 	}
-  
+
 	const [storedTime, storedState] = cookieValue.split('-').map((value) => value.trim());
-  
+
 	if (currentTime - storedTime < 30 * 60 * 1000 && storedState === 'New') {
 		cookie = setCookie(domain, cookieName, `${currentTime}-New`, cookieAttributes);
 		visitorStatus = 'New';
 	}
-  
+
 	cookie = setCookie(domain, cookieName, `${currentTime}-Repeat`, cookieAttributes);
 	visitorStatus = 'Repeat';
 
@@ -447,11 +447,11 @@ export function getEntitlementCreativeCloud(profile, scope) {
 	  const serviceAccount = profile.serviceAccounts.find(
 		(sa) => sa.serviceCode === 'creative_cloud',
 	  );
-  
+
 	  if (!serviceAccount) {
 		return 'notEntitled';
 	  }
-  
+
 	  if (serviceAccount.serviceLevel === 'CS_LVL_2') {
 		return 'paid';
 	  } if (serviceAccount.serviceLevel === 'CS_LVL_1') {
@@ -461,7 +461,7 @@ export function getEntitlementCreativeCloud(profile, scope) {
 	}
 	return 'notEntitled';
   }
-  
+
  export function getEntitlementStatusCreativeCloud(profile, scope) {
 	if (
 	  scope

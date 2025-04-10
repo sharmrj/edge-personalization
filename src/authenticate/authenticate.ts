@@ -71,7 +71,7 @@ const getToken = async (aux_sid: string, client_secret: string): Promise<string 
       method: "POST",
       body: JSON.stringify(data),
     });
-    if (!response.ok) throw new Error(`Token response not ok: ${response}`);
+    if (!response.ok) throw new Error(`Token response not ok: ${JSON.stringify(response)}`);
     const json = await response.json();
   return json.access_token ?? null;
   } catch (e) {
@@ -89,7 +89,7 @@ const getProfile = async (token: string, client_secret: string): Promise< {[key:
         'Authorization': `Bearer ${token}`,
       },
     });
-    if (!response.ok) throw new Error(`Token response not ok: ${response}`);
+    if (!response.ok) throw new Error(`Token response not ok: ${JSON.stringify(response)}`);
     const json = await response.json();
     return json;
   } catch (e) {

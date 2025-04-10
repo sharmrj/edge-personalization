@@ -50,11 +50,16 @@ export const authenticate = async (request: Request, env: Env): Promise<AuthStat
   const aux_sid = cookie.split(';').map(x => x.trim().split('=')).find(([name]) => name === 'aux_sid')?.[1];
   const loggedOut: AuthState = { type: "LoggedOut", data: { authState: 'loggedOut', returningStatus: 'New' } };
   if (!aux_sid) return loggedOut;
+  const tokenStart = performance.now();
   const token = await getToken(aux_sid, env.CLIENT_SECRET);
+  const tokenEnd = performance.now();
+  console.log(`Token request took: ${tokenEnd - tokenStart}ms`);
   if (!token) return loggedOut;
+  const profileStart = performance.now();
   const profile = await getProfile(token, env.CLIENT_SECRET);
+  const profileEnd = performance.now();
+  console.log(`Profile request took: ${profileEnd - profileStart}ms`);
   if (!profile) return loggedOut;
-  console.log(profile);
 
   const adobeIMSUserProfile: AdobeIMSUserProfile = {
     account_type: profile.account_type ?? "unknown",

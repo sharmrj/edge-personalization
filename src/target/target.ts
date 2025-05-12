@@ -405,7 +405,7 @@ function setCookie(domain, key, value, options = {}) {
       cookies[key] = value
     }
   })
-	const cookieValue = cookies.?[cookieName] ?? "";
+	const cookieValue = cookies?.[cookieName] ?? "";
 	let visitorStatus;
 	let cookie;
 

@@ -10,8 +10,9 @@ export async function getPersonalizationData(request: Request, authState: AuthSt
   return parseRawData(rawData);
 }
 
-async function fetchPersonalizationData(request: Request, authState): Promise<unknown> {
-  const url = new URL(request.url);
+async function fetchPersonalizationData(request, authState: AuthState): Promise<unknown> {
+  const urlString = `${request.scheme}://${request.host}${request.url}`;
+  const url = new URL(urlString);
   const env = [
     "stage",
     "dev",
@@ -91,7 +92,7 @@ async function fetchPersonalizationData(request: Request, authState): Promise<un
 
 // Create request payload for Adobe Target
 function createRequestPayload({ updatedContext, pageName, locale, env, url, request, DATA_STREAM_ID, authState }) {
-  const cookieHeader = request.headers.get("Cookie") || ""
+  const cookieHeader = request.getHeader("Cookie") || ""
   const cookies = {}
 
   cookieHeader.split(";").forEach((cookie) => {
@@ -172,7 +173,7 @@ function createRequestPayload({ updatedContext, pageName, locale, env, url, requ
             linkClicks: { value: 1 },
           },
           "webReferrer": {
-            "URL": request.headers.get("Referer") || ""
+            "URL": request.getHeader("Referer") || ""
           }
         },
         "timestamp": new Date().toISOString(),
@@ -385,19 +386,18 @@ function setCookie(domain, key, value, options = {}) {
   }
 
  export const getVisitorStatus = ({
-	request,
+  request,
 	expiryDays = 30,
 	cookieName = 's_nr',
   domain,
 	// domain = `.${(new URL(window.location.origin)).hostname}`,
   }) => {
-  const url = new URL(request.url);
 	const currentTime = Date.now();
 
-  const cookieHeader = request.headers.get("Cookie") || ""
+  const cookieHeader = request.getHeader("Cookie") || ""
   const cookies = {}
 
-  cookieHeader.split(";").forEach((cookie) => {
+  cookieHeader?.split(";").forEach((cookie) => {
     const parts = cookie.trim().split("=")
     if (parts.length >= 2) {
       const key = parts[0].trim()
@@ -405,7 +405,7 @@ function setCookie(domain, key, value, options = {}) {
       cookies[key] = value
     }
   })
-	const cookieValue = cookies[cookieName];
+	const cookieValue = cookies.?[cookieName] ?? "";
 	let visitorStatus;
 	let cookie;
 

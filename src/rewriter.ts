@@ -1,4 +1,5 @@
 import { ProcessedData } from "./target/target";
+import { HtmlRewritingStream } from 'html-rewriter';
 
 const COMMANDS_KEYS = {
   remove: 'remove',
@@ -6,7 +7,7 @@ const COMMANDS_KEYS = {
   updateAttribute: 'updateattribute',
 };
 
-export const rewrite = async (response: Response, data: ProcessedData): Promise<Response> => {
+export const rewrite = async (response, data: ProcessedData): Promise<Response> => {
   const transformedData = await Promise.all(
     data?.commands?.map(async (cmd) => {
       // let modified = modifySelectorTerm(cmd.selector);
@@ -18,12 +19,11 @@ export const rewrite = async (response: Response, data: ProcessedData): Promise<
     })
   );
 
-  const rewriter = new HTMLRewriter().on("head", {
+  const rewriter = new HtmlRewritingStream().onElement("head", {
     element(element) {
-      element.append('<meta name="edge-personalized" content="true" />', { html: true })
+      element.append('<meta name="edge-personalized" content="true" />')
       element.append(
         `<script>window.edgePersonalizationApplied = true;</script>`,
-        { html: true }
       )
     },
   });
@@ -35,28 +35,28 @@ export const rewrite = async (response: Response, data: ProcessedData): Promise<
       const fragmentHTML = await fetchFragmentContent(path);
       if (!fragmentHTML) continue;
 
-      rewriter.on(selector, {
+      rewriter.onElement(selector, {
         element(element) {
-          element.setInnerContent(fragmentHTML, { html: true });
+          element.replaceChildren(fragmentHTML);
         },
       });
 
       continue;
     }
 
-    rewriter.on(selector, {
+    rewriter.onElement(selector, {
       element(element) {
         if (action === "remove") {
           element.remove();
         } else if (action === "replace") {
-          element.setInnerContent(content, { html: true });
+          element.replaceChildren(content);
         } else if (action === "updateAttribute" && attribute) {
           element.setAttribute(attribute, content);
         }
       },
     });
   }
-  return rewriter.transform(response);
+  return response.pipeThrough(rewriter);
 };
 
 function modifyNonFragmentSelector(selector, action) {
